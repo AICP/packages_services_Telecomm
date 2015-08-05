@@ -668,6 +668,7 @@ public class TelecomService extends Service {
         public void addNewIncomingCall(PhoneAccountHandle phoneAccountHandle, Bundle extras) {
             Log.i(this, "Adding new incoming call with phoneAccountHandle %s", phoneAccountHandle);
             if (phoneAccountHandle != null && phoneAccountHandle.getComponentName() != null) {
+
                 mAppOpsManager.checkPackage(
                         Binder.getCallingUid(), phoneAccountHandle.getComponentName().getPackageName());
 
