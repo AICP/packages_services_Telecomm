@@ -22,6 +22,30 @@
       "revId": "ea762d89eca441d18e215c69332432fe93d5ba5e",
       "serverId": "9f904cbb-a964-4fab-a7dc-5cfc4d5c238b",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d22c307b_105448ba",
+        "filename": "src/com/android/server/telecom/BluetoothPhoneServiceImpl.java",
+        "patchSetId": 1
+      },
+      "lineNbr": 275,
+      "author": {
+        "id": 1375
+      },
+      "writtenOn": "2020-02-11T19:52:27Z",
+      "side": 1,
+      "message": "fixed in PS2",
+      "parentUuid": "d2f23d2f_01e514b5",
+      "range": {
+        "startLine": 275,
+        "startChar": 38,
+        "endLine": 275,
+        "endChar": 65
+      },
+      "revId": "ea762d89eca441d18e215c69332432fe93d5ba5e",
+      "serverId": "9f904cbb-a964-4fab-a7dc-5cfc4d5c238b",
+      "unresolved": true
     }
   ]
 }
