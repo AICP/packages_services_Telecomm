@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "d2f23d2f_01e514b5",
+        "filename": "src/com/android/server/telecom/BluetoothPhoneServiceImpl.java",
+        "patchSetId": 1
+      },
+      "lineNbr": 275,
+      "author": {
+        "id": 3
+      },
+      "writtenOn": "2020-02-11T16:58:05Z",
+      "side": 1,
+      "message": "packages/services/Telecomm/src/com/android/server/telecom/BluetoothPhoneServiceImpl.java:275: error: cannot find symbol\n                        TelecomManager.EXTRA_CALL_TECHNOLOGY_TYPE);\n                        ^\n  symbol: variable TelecomManager\n1 error",
+      "range": {
+        "startLine": 275,
+        "startChar": 38,
+        "endLine": 275,
+        "endChar": 65
+      },
+      "revId": "ea762d89eca441d18e215c69332432fe93d5ba5e",
+      "serverId": "9f904cbb-a964-4fab-a7dc-5cfc4d5c238b",
+      "unresolved": true
+    }
+  ]
+}
