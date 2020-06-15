@@ -547,7 +547,11 @@ public class CallsManager extends Call.ListenerBase
                 CarrierConfigManager.ACTION_CARRIER_CONFIG_CHANGED);
         intentFilter.addAction(SystemContract.ACTION_BLOCK_SUPPRESSION_STATE_CHANGED);
         context.registerReceiver(mReceiver, intentFilter);
-        QtiCarrierConfigHelper.getInstance().setup(mContext);
+        final String useQtiCarrierConfigHelper = SystemProperties.get("ro.no.qti.carrier.config.helper","false");
+       if (!useQtiCarrierConfigHelper.equals("true"))
+       {
+           QtiCarrierConfigHelper.getInstance().setup(mContext);
+       }
     }
 
     public void setIncomingCallNotifier(IncomingCallNotifier incomingCallNotifier) {
