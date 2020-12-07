@@ -16,11 +16,17 @@
 
 package com.android.server.telecom;
 
+import android.content.pm.PackageManager;
+import android.hardware.camera2.CameraManager;
+import android.os.AsyncTask;
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.Person;
+import android.content.ContentResolver;
 import android.content.Context;
+import android.os.UserHandle;
 import android.os.VibrationEffect;
+import android.provider.Settings;
 import android.telecom.Log;
 import android.telecom.TelecomManager;
 import android.media.AudioAttributes;
@@ -114,6 +120,9 @@ public class Ringer {
 
     private static final int REPEAT_SIMPLE_VIBRATION_AT = 1;
 
+    private int mRampingRingerDuration = -1;  // ramping ringer duration in millisecond
+    private float mRampingRingerStartVolume = 0f;
+
     private static final float EPSILON = 1e-6f;
 
     private static final AudioAttributes VIBRATION_ATTRIBUTES = new AudioAttributes.Builder()
@@ -145,6 +154,8 @@ public class Ringer {
 
     private CompletableFuture<Void> mVibrateFuture = CompletableFuture.completedFuture(null);
 
+    private TorchToggler torchToggler;
+
     private InCallTonePlayer mCallWaitingPlayer;
     private RingtoneFactory mRingtoneFactory;
 
@@ -160,6 +171,9 @@ public class Ringer {
      * Used to track the status of {@link #mVibrator} in the case of simultaneous incoming calls.
      */
     private boolean mIsVibrating = false;
+
+    private int torchMode;
+    private boolean mFlashOnCallWait;
 
     /** Initializes the Ringer. */
     @VisibleForTesting
@@ -183,6 +197,8 @@ public class Ringer {
         mRingtoneFactory = ringtoneFactory;
         mInCallController = inCallController;
         mVibrationEffectProxy = vibrationEffectProxy;
+
+	torchToggler = new TorchToggler(context);
 
         if (mContext.getResources().getBoolean(R.bool.use_simple_vibration_pattern)) {
             mDefaultVibrationEffect = mVibrationEffectProxy.createWaveform(SIMPLE_VIBRATION_PATTERN,
@@ -303,10 +319,31 @@ public class Ringer {
                 hapticsFuture = mRingtonePlayer.play(mRingtoneFactory, foregroundCall,
                         mVolumeShaperConfig, isVibratorEnabled);
             } else {
-                // Ramping ringtone is not enabled.
-                hapticsFuture = mRingtonePlayer.play(mRingtoneFactory, foregroundCall, null,
-                        isVibratorEnabled);
+                final ContentResolver cr = mContext.getContentResolver();
+                if (Settings.System.getInt(cr,
+                        Settings.System.INCREASING_RING, 0) != 0) {
+                    float startVolume = Settings.System.getFloat(cr,
+                            Settings.System.INCREASING_RING_START_VOLUME, 0.1f);
+                    int rampUpTime = Settings.System.getInt(cr,
+                            Settings.System.INCREASING_RING_RAMP_UP_TIME, 20);
+                    if (mVolumeShaperConfig == null
+                        || mRampingRingerDuration != rampUpTime
+                        || mRampingRingerStartVolume != startVolume) {
+                        mVolumeShaperConfig = new VolumeShaper.Configuration.Builder()
+                            .setDuration(rampUpTime * 1000)
+                            .setCurve(new float[] {0.f, 1.f}, new float[] {startVolume, 1.f})
+                            .setInterpolatorType(VolumeShaper.Configuration.INTERPOLATOR_TYPE_LINEAR)
+                            .build();
+                        mRampingRingerDuration = rampUpTime;
+                        mRampingRingerStartVolume = startVolume;
+                    }
+                } else {
+                    mVolumeShaperConfig = null;
+                }
+                hapticsFuture = mRingtonePlayer.play(mRingtoneFactory, foregroundCall,
+                        mVolumeShaperConfig, isVibratorEnabled);
                 effect = getVibrationEffectForCall(mRingtoneFactory, foregroundCall);
+
             }
         } else {
             String reason = String.format(
@@ -344,6 +381,40 @@ public class Ringer {
             Log.w(this, "startRinging: No haptics future; fallback to default behavior");
             maybeStartVibration(foregroundCall, shouldRingForContact, effect, isVibratorEnabled,
                     isRingerAudible);
+        }
+
+        torchMode = Settings.System.getIntForUser(mContext.getContentResolver(),
+                Settings.System.FLASHLIGHT_ON_CALL, 0, UserHandle.USER_CURRENT);
+        boolean shouldFlash = false;
+        if (torchMode != 0) {
+            switch (torchMode) {
+                case 1: // Flash when ringer is audible
+                    shouldFlash = isRingerAudible;
+                    break;
+                case 2: // Flash when ringer is not audible
+                    shouldFlash = !isRingerAudible;
+                    break;
+                case 3: // Flash when entirely silent (no vibration or sound)
+                    shouldFlash = !isVibratorEnabled && !isRingerAudible;
+                    break;
+                case 4: // Flash always
+                    shouldFlash = true;
+                    break;
+            }
+        }
+
+        boolean ignoreDND = Settings.System.getIntForUser(mContext.getContentResolver(),
+                Settings.System.FLASHLIGHT_ON_CALL_IGNORE_DND, 0,
+                UserHandle.USER_CURRENT) == 1;
+        if (!ignoreDND && shouldFlash) { // respect DND
+            int zenMode = Settings.Global.getInt(mContext.getContentResolver(),
+                    Settings.Global.ZEN_MODE, Settings.Global.ZEN_MODE_OFF);
+            shouldFlash = zenMode == Settings.Global.ZEN_MODE_OFF ||
+                          zenMode == Settings.Global.ZEN_MODE_OFF_ONLY;
+        }
+
+        if (shouldFlash) {
+            blinkFlashlight();
         }
 
         return shouldAcquireAudioFocus;
@@ -391,6 +462,11 @@ public class Ringer {
         return effect;
     }
 
+    private void blinkFlashlight() {
+        torchToggler = new TorchToggler(mContext);
+        torchToggler.execute();
+    }
+
     public void startCallWaiting(Call call) {
         startCallWaiting(call, null);
     }
@@ -414,6 +490,13 @@ public class Ringer {
 
         stopRinging();
 
+        mFlashOnCallWait = Settings.System.getIntForUser(mContext.getContentResolver(),
+                Settings.System.FLASHLIGHT_ON_CALL_WAITING, 0, UserHandle.USER_CURRENT) == 1;
+
+        if (mFlashOnCallWait) {
+            blinkFlashlight();
+        }
+
         if (mCallWaitingPlayer == null) {
             Log.addEvent(call, LogUtils.Events.START_CALL_WAITING_TONE, reason);
             mCallWaitingCall = call;
@@ -430,6 +513,7 @@ public class Ringer {
         }
 
         mRingtonePlayer.stop();
+        torchToggler.stop();
 
         // If we haven't started vibrating because we were waiting for the haptics info, cancel
         // it and don't vibrate at all.
@@ -455,6 +539,13 @@ public class Ringer {
 
             mCallWaitingPlayer.stopTone();
             mCallWaitingPlayer = null;
+        }
+
+        mFlashOnCallWait = Settings.System.getIntForUser(mContext.getContentResolver(),
+                Settings.System.FLASHLIGHT_ON_CALL_WAITING, 0, UserHandle.USER_CURRENT) == 1;
+
+        if (mFlashOnCallWait) {
+            torchToggler.stop();
         }
     }
 
@@ -516,5 +607,49 @@ public class Ringer {
         }
         return mSystemSettingsUtil.canVibrateWhenRinging(context)
             || mSystemSettingsUtil.applyRampingRinger(context);
+    }
+
+    private class TorchToggler extends AsyncTask {
+
+        private boolean shouldStop = false;
+        private CameraManager cameraManager;
+        private int duration;
+        private boolean hasFlash = true;
+        private Context context;
+
+        public TorchToggler(Context ctx) {
+            this.context = ctx;
+            init();
+        }
+
+        private void init() {
+            cameraManager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
+            hasFlash = context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA_FLASH);
+            duration = 400 / Settings.System.getIntForUser(context.getContentResolver(),
+                    Settings.System.FLASHLIGHT_ON_CALL_RATE, 1, UserHandle.USER_CURRENT);
+        }
+
+        void stop() {
+            shouldStop = true;
+        }
+
+        @Override
+        protected Object doInBackground(Object[] objects) {
+            if (hasFlash) {
+                try {
+                    String cameraId = cameraManager.getCameraIdList()[0];
+                    while (!shouldStop) {
+                        cameraManager.setTorchMode(cameraId, true);
+                        Thread.sleep(duration);
+
+                        cameraManager.setTorchMode(cameraId, false);
+                        Thread.sleep(duration);
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+            return null;
+        }
     }
 }
