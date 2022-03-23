@@ -397,7 +397,7 @@ public class Ringer {
                     mVolumeShaperConfig = null;
                 }
                 hapticsFuture = mRingtonePlayer.play(mRingtoneFactory, foregroundCall,
-                        mVolumeShaperConfig, isVibratorEnabled);
+                        mVolumeShaperConfig, attributes.isRingerAudible(), isVibratorEnabled);
                 effect = getVibrationEffectForCall(mRingtoneFactory, foregroundCall);
             }
         } else {
