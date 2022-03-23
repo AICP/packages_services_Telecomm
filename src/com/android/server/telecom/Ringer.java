@@ -471,8 +471,7 @@ public class Ringer {
         if (!ignoreDND && shouldFlash) { // respect DND
             int zenMode = Settings.Global.getInt(mContext.getContentResolver(),
                     Settings.Global.ZEN_MODE, Settings.Global.ZEN_MODE_OFF);
-            shouldFlash = zenMode == Settings.Global.ZEN_MODE_OFF ||
-                          zenMode == Settings.Global.ZEN_MODE_OFF_ONLY;
+            shouldFlash = zenMode == Settings.Global.ZEN_MODE_OFF;
         }
 
         if (shouldFlash) {
