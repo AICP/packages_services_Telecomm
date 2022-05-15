@@ -16,6 +16,23 @@
       "message": "logs: http://haste.aicp-rom.com/equlanonaz.java",
       "revId": "dd0181e0fb5c341a0bf4a74aeda77c36976fdf77",
       "serverId": "9f904cbb-a964-4fab-a7dc-5cfc4d5c238b"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "4361a150_c9f07c88",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 3
+      },
+      "writtenOn": "2022-05-15T13:37:29Z",
+      "side": 1,
+      "message": "Better to follow this conversation before merging: https://review.lineageos.org/c/LineageOS/android_vendor_lineage/+/331362",
+      "revId": "dd0181e0fb5c341a0bf4a74aeda77c36976fdf77",
+      "serverId": "9f904cbb-a964-4fab-a7dc-5cfc4d5c238b"
     }
   ]
 }
